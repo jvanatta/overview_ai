@@ -36,7 +36,7 @@ def find_corners(image, channel_threshold, dilate_erode_amount):
     This isn't completely robust, extreme enough perspective transforms could result in the same point
     getting chosen twice.
 '''
-def sort_corners(unsorted_corners, image_height, image_width):
+def sort_corners(unsorted_corners, image_width, image_height):
 
     def distance_cost(a_tuple, b_tuple):
         return (a_tuple[0] - b_tuple[0])**2 + (a_tuple[1] - b_tuple[1])**2
@@ -87,11 +87,12 @@ if __name__ == '__main__':
         if input_image is None:
             sys.exit("Bad input, check your filename: {0}".format(input_image))
 
+        image_width = input_image.shape[1]
+        image_height = input_image.shape[0]
+
         # Detect the corners in the input image, then sort them to the same TL, TR, BR, BL order as the output
-        detected_corners = sort_corners(find_corners(input_image, detection_mask_threshold, dilate_erode_amount), input_image.shape[1], input_image.shape[0])
-        print("\n \n")
-        print(input_image.shape[1], input_image.shape[0])
-        print(detected_corners)
+        detected_corners = sort_corners(find_corners(input_image, detection_mask_threshold, dilate_erode_amount), image_width, image_height)
+
         output_corners = np.array([
             [0, 0],
             [output_x_size - 1, 0],
@@ -110,7 +111,7 @@ if __name__ == '__main__':
 
             for corner in detected_corners:
                 cv.circle(input_image, (corner[0], corner[1]), 10, (100, 0, 40), 3)
-            cv.imshow("modified", input_image)
+            cv.imshow("input", input_image)
             cv.imshow("corrected", corrected_image)
 
     print("All done!")

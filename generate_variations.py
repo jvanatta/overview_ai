@@ -40,7 +40,7 @@ def random_distort(image, max_affine, max_projective):
         [random.uniform(-1 * max_projective, max_projective), random.uniform(-1 * max_projective, max_projective), 1]
     ], dtype="float32")
 
-    return cv.warpPerspective(image, distortion_array, (image.shape[0], image.shape[1]), borderMode=cv.BORDER_REPLICATE, flags=cv.WARP_INVERSE_MAP)
+    return cv.warpPerspective(image, distortion_array, (image.shape[1], image.shape[0]), borderMode=cv.BORDER_REPLICATE, flags=cv.WARP_INVERSE_MAP)
 
 
 ''' Generate randomly adjusted variations of an input image.
@@ -54,11 +54,11 @@ if __name__ == '__main__':
     # These random values normally generate good output, but there's a possibility a 'perfect storm'
     # will result in the image being transformed beyond the edge of padding.
     # If so, the corner recovery will fail.
-    max_rotation_deg = 40
+    max_rotation_deg = 20
     max_hue_shift = 30
     max_scale_factor = .1
-    max_affine_warp = .04
-    max_projective_warp = .00015
+    max_affine_warp = .03
+    max_projective_warp = .0001
 
     raw_image = cv.imread(source_filename)
     if raw_image is None:
@@ -68,12 +68,16 @@ if __name__ == '__main__':
         # Rotating and warping an image require plenty of padding to ensure we don't clip useful parts in the process.
         # Using BORDER_REPLICATE means there are no sudden transitions in the background. That will help with finding
         # the true PCB corners later.
-        adjusted_image = cv.copyMakeBorder(raw_image, raw_image.shape[0], raw_image.shape[0], raw_image.shape[1], raw_image.shape[1],
-                                         borderType=cv.BORDER_REPLICATE)
+        adjusted_image = cv.copyMakeBorder(raw_image, raw_image.shape[0], raw_image.shape[0],
+                                           raw_image.shape[1], raw_image.shape[1], borderType=cv.BORDER_REPLICATE)
+        adjusted_width = adjusted_image.shape[1]
+        adjusted_height = adjusted_image.shape[0]
+
         adjusted_image = random_hue_shift(adjusted_image, max_hue_shift)
         adjusted_image = random_scale(adjusted_image, max_scale_factor)
-        adjusted_image = random_rotation(adjusted_image, (adjusted_image.shape[0], adjusted_image.shape[1]), max_rotation_deg,
-                                         (adjusted_image.shape[1] // 2, adjusted_image.shape[0] // 2))
+        # Rotations are a subset of the affine transforms done in random_distort, so this is *not* the fastest way to do this.
+        adjusted_image = random_rotation(adjusted_image, (adjusted_width, adjusted_height), max_rotation_deg,
+                                         (adjusted_width // 2, adjusted_height // 2))
         adjusted_image = random_distort(adjusted_image, max_affine_warp, max_projective_warp)
 
         cv.imwrite("variations/variation_{:02d}.jpg".format(i), adjusted_image)
