@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 # Python 3
+import os
 import random
+import sys
 
 import cv2 as cv
 import numpy as np
 
-''' There's some weirdness here if this goes above 75 or so, wherein the hue shifts appear visually discontinuous
+''' This doesn't shift backwards (negative), and there's some weirdness if max_amount goes above 75 or so, 
+    wherein the hue shifts appear visually discontinuous.
 '''
 def random_hue_shift(image, max_amount):
     hue_channel, sat_channel, val_channel = cv.split(cv.cvtColor(image, cv.COLOR_BGR2HSV))
@@ -40,28 +43,39 @@ def random_distort(image, max_affine, max_projective):
     return cv.warpPerspective(image, distortion_array, (image.shape[0], image.shape[1]), borderMode=cv.BORDER_REPLICATE, flags=cv.WARP_INVERSE_MAP)
 
 
+''' Generate randomly adjusted variations of an input image.
+'''
 if __name__ == '__main__':
+    source_filename = "pcb.jpg"
+    variation_count = 25
+    if not os.path.exists("variations"):
+        os.makedirs("variations")
+
     # These random values normally generate good output, but there's a possibility a 'perfect storm'
     # will result in the image being transformed beyond the edge of padding.
     # If so, the corner recovery will fail.
-    source_filename = "pcb.jpeg"
-    max_rotation_deg = 15
+    max_rotation_deg = 40
     max_hue_shift = 30
     max_scale_factor = .1
     max_affine_warp = .04
     max_projective_warp = .00015
 
     raw_image = cv.imread(source_filename)
+    if raw_image is None:
+        sys.exit("Bad input, check your filename: {0}".format(source_filename))
 
-    # Rotating and warping an image require plenty of padding to ensure we don't clip useful parts in the process.
-    # Using BORDER_REPLICATE means there are no sudden transitions in the background. That will help with finding
-    # the true PCB corners later.
-    adjusted_image = cv.copyMakeBorder(raw_image, raw_image.shape[0], raw_image.shape[0], raw_image.shape[1], raw_image.shape[1],
-                                     borderType=cv.BORDER_REPLICATE)
-    adjusted_image = random_hue_shift(adjusted_image, max_hue_shift)
-    adjusted_image = random_scale(adjusted_image, max_scale_factor)
-    adjusted_image = random_rotation(adjusted_image, (adjusted_image.shape[0], adjusted_image.shape[1]), max_rotation_deg,
-                                     (adjusted_image.shape[1] // 2, adjusted_image.shape[0] // 2))
-    adjusted_image = random_distort(adjusted_image, max_affine_warp, max_projective_warp)
+    for i in range(variation_count):
+        # Rotating and warping an image require plenty of padding to ensure we don't clip useful parts in the process.
+        # Using BORDER_REPLICATE means there are no sudden transitions in the background. That will help with finding
+        # the true PCB corners later.
+        adjusted_image = cv.copyMakeBorder(raw_image, raw_image.shape[0], raw_image.shape[0], raw_image.shape[1], raw_image.shape[1],
+                                         borderType=cv.BORDER_REPLICATE)
+        adjusted_image = random_hue_shift(adjusted_image, max_hue_shift)
+        adjusted_image = random_scale(adjusted_image, max_scale_factor)
+        adjusted_image = random_rotation(adjusted_image, (adjusted_image.shape[0], adjusted_image.shape[1]), max_rotation_deg,
+                                         (adjusted_image.shape[1] // 2, adjusted_image.shape[0] // 2))
+        adjusted_image = random_distort(adjusted_image, max_affine_warp, max_projective_warp)
 
-    cv.imwrite("variation.jpg", adjusted_image)
+        cv.imwrite("variations/variation_{:02d}.jpg".format(i), adjusted_image)
+
+    print("Wrote {0} variation images".format(variation_count))
