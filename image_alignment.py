@@ -15,29 +15,33 @@ def random_hue_shift(image, max_amount):
 
     return cv.cvtColor(cv.merge([hue_channel + adjustment, sat_channel, val_channel]), cv.COLOR_HSV2BGR)
 
-
-def random_rotation_matrix(max_amount_deg, center_point):
-    return cv.getRotationMatrix2D(center_point, random.uniform(-1 * max_amount_deg, max_amount_deg), 1)
-
-
-def random_scale(original_size, max_amount):
+def random_scale(image, max_amount):
     scale_amount = 1.0 + random.uniform(-1 * max_amount, max_amount)
+    new_size = int(round(image.shape[1] * scale_amount)), int(round(image.shape[0] * scale_amount))
+    return cv.resize(image, new_size, interpolation=cv.INTER_LINEAR)
 
-    return int(round(original_size[0] * scale_amount)), int(round(original_size[1] * scale_amount))
+
+def random_rotation(image, output_size, max_amount_deg, center_point):
+    rotation_matrix = cv.getRotationMatrix2D(center_point, random.uniform(-1 * max_amount_deg, max_amount_deg), 1)
+
+    return cv.warpAffine(image, rotation_matrix, output_size, borderMode=cv.BORDER_REPLICATE)
 
 
-def random_distort(max_affine, max_projective):
+def random_distort(image, max_affine, max_projective):
     distortion_array = np.array([
         [1 + random.uniform(-1 * max_affine, max_affine), random.uniform(-1 * max_affine, max_affine), 0],
         [random.uniform(-1 * max_affine, max_affine), 1 + random.uniform(-1 * max_affine, max_affine), 0],
         [random.uniform(-1 * max_projective, max_projective), random.uniform(-1 * max_projective, max_projective), 1]
     ], dtype="float32")
 
-    return distortion_array
+    return cv.warpPerspective(image, distortion_array, (image.shape[0], image.shape[1]), borderMode=cv.BORDER_REPLICATE, flags=cv.WARP_INVERSE_MAP)
+
 
 def find_corners(image):
     # Adapted from Kinght's answer here:
     # https://stackoverflow.com/questions/8667818/opencv-c-obj-c-detecting-a-sheet-of-paper-square-detection
+    # Masking in saturation works well for the two base PCB images I tested on, but it's certainly not infallible.
+    # Consistency of the lighting, background, and PCB color is important. Masking on value also works.
     dilate_erode_amount = 80
     channel_threshold = 80
     hue_channel, sat_channel, val_channel = cv.split(cv.cvtColor(image, cv.COLOR_BGR2HSV))
@@ -52,87 +56,69 @@ def find_corners(image):
     approx = cv.approxPolyDP(largest_contour, 0.02 * arclen, True)
 
     if len(approx) < 4:
-        sys.exit("Couldn't find enough corner points")
+        print("ERROR: Couldn't find enough corner points")
 
-    def distance_cost(a_tuple, b_tuple):
-        return (a_tuple[0] - b_tuple[0])**2 + (a_tuple[1] - b_tuple[1])**2
+    return approx
 
+
+def sort_corners(unsorted_corners, image_height, image_width):
     # This isn't completely robust, extreme enough perspective transforms could result in the same point
     # getting chosen twice
     # Order: TL, TR, BR, BL
-
-    image_width = image.shape[1]
-    image_height = image.shape[0]
+    def distance_cost(a_tuple, b_tuple):
+        return (a_tuple[0] - b_tuple[0])**2 + (a_tuple[1] - b_tuple[1])**2
 
     distance_costs = [[], [], [], []]
-    for corner in approx:
+    for corner in unsorted_corners:
         new_coord = (corner[0][0], corner[0][1])
         distance_costs[0].append(distance_cost((0, 0), new_coord))
         distance_costs[1].append(distance_cost((image_width, 0), new_coord))
         distance_costs[2].append(distance_cost((image_width, image_height), new_coord))
         distance_costs[3].append(distance_cost((0, image_height), new_coord))
 
-    return_array = np.zeros((4, 2), dtype=np.float32)
+    sorted_corners = np.zeros((4, 2), dtype=np.float32)
     for i in range(4):
-        #print (distance_costs[i])
-        #print(approx[distance_costs[i].index(min(distance_costs[i]))])
-        print(approx[distance_costs[i].index(min(distance_costs[i]))])
-        return_array[i, ::] = approx[distance_costs[i].index(min(distance_costs[i]))]
+        sorted_corners[i, ::] = unsorted_corners[distance_costs[i].index(min(distance_costs[i]))]
 
-    print (return_array)
-    return return_array
+    return sorted_corners
 
 if __name__ == '__main__':
+    # These random values normally generate good output, but there's a possibility a 'perfect storm' alignment
+    # will result in the image being transformed beyond the edge of padding.
+    # If so, the corner recovery will fail.
     source_filename = "pcb.jpeg"
     max_rotation_deg = 15
-    max_hue_shift = 50
+    max_hue_shift = 30
     max_scale_factor = .1
     max_affine_warp = .04
     max_projective_warp = .00015
 
     raw_image = cv.imread(source_filename)
 
-    resized_image = cv.resize(raw_image, random_scale((raw_image.shape[1], raw_image.shape[0]), max_scale_factor),
-                              interpolation=cv.INTER_LINEAR)
-    resized_center = (resized_image.shape[0] // 2, resized_image.shape[1] // 2)
-
     # Rotating and warping an image require plenty of padding to ensure we don't clip useful parts in the process.
     # Using BORDER_REPLICATE means there are no sudden transitions in the background. That will help with finding
     # the true PCB corners later.
-    padded_image = cv.copyMakeBorder(resized_image, resized_image.shape[0], resized_image.shape[0], resized_image.shape[1], resized_image.shape[1],
+    adjusted_image = cv.copyMakeBorder(raw_image, raw_image.shape[0], raw_image.shape[0], raw_image.shape[1], raw_image.shape[1],
                                      borderType=cv.BORDER_REPLICATE)
+    adjusted_image = random_hue_shift(adjusted_image, max_hue_shift)
+    adjusted_image = random_scale(adjusted_image, max_scale_factor)
+    adjusted_image = random_rotation(adjusted_image, (adjusted_image.shape[0], adjusted_image.shape[1]), max_rotation_deg,
+                                     (adjusted_image.shape[1] // 2, adjusted_image.shape[0] // 2))
+    adjusted_image = random_distort(adjusted_image, max_affine_warp, max_projective_warp)
 
-    rows, columns, channels = padded_image.shape
-    padded_center = (columns // 2, rows // 2)
+    corners = sort_corners(find_corners(adjusted_image), adjusted_image.shape[1], adjusted_image.shape[0])
 
-
-    # A bit unfortunate to have rotation and warping done separately, since rotations are a subset of affine warps.
-    # Homogeneous coordinates everywhere would make the matrix math cleaner.
-    modified_image = cv.warpAffine(padded_image, random_rotation_matrix(max_rotation_deg, padded_center), (columns, rows),
-                                  borderMode=cv.BORDER_REPLICATE)
-
-    modified_image = cv.warpPerspective(modified_image, random_distort(max_affine_warp, max_projective_warp), (columns, rows), borderMode=cv.BORDER_REPLICATE, flags=cv.WARP_INVERSE_MAP)
-
-    modified_image = random_hue_shift(modified_image, max_hue_shift)
-
-    corners = find_corners(modified_image)
-
-    x_size = 600
-    y_size = 450
+    output_x_size = 600
+    output_y_size = 450
 
     output_corners = np.array([
         [0, 0],
-        [x_size - 1, 0],
-        [x_size - 1, y_size - 1],
-        [0, y_size - 1]], dtype="float32")
-
-    print (corners.shape)
-    print(output_corners.shape)
-
-    #output_corners = np.array([(0,0), (0, 400), (400, 0), (400, 400)])
+        [output_x_size - 1, 0],
+        [output_x_size - 1, output_y_size - 1],
+        [0, output_y_size - 1]], dtype="float32")
 
     correction_matrix = cv.getPerspectiveTransform(corners, output_corners)
-    correct_image = cv.warpPerspective(modified_image, correction_matrix, (600, 450))
+    correct_image = cv.warpPerspective(adjusted_image, correction_matrix, (600, 450))
 
     while True:
         k = cv.waitKey(1)
@@ -140,6 +126,6 @@ if __name__ == '__main__':
             break
 
         for corner in corners:
-            cv.circle(modified_image, (corner[0], corner[1]), 10, (100, 0, 40), 3)
-        cv.imshow("modified", modified_image)
+            cv.circle(adjusted_image, (corner[0], corner[1]), 10, (100, 0, 40), 3)
+        cv.imshow("modified", adjusted_image)
         cv.imshow("corrected", correct_image)
