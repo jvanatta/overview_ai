@@ -64,12 +64,10 @@ def sort_corners(unsorted_corners, image_width, image_height):
     it could be easily modified to detect based on value or hue.
 '''
 if __name__ == '__main__':
-    # These random values normally generate good output, but there's a possibility a 'perfect storm'
-    # will result in the image being transformed beyond the edge of padding.
-    # If so, the corner recovery will fail.
     source_files = "variations"
     output_x_size = 600
     output_y_size = 450
+    # Detection is done on saturation, the background must be below this saturation level
     detection_mask_threshold = 80
     dilate_erode_amount = 80
 
@@ -81,6 +79,9 @@ if __name__ == '__main__':
         images_to_process.append(source_files)
 
     print("Starting work on {0} image files...".format(len(images_to_process)))
+
+    previous_edge_image = None
+    edge_difference_image = None
 
     for image_filename in images_to_process:
         input_image = cv.imread(image_filename)
@@ -103,16 +104,31 @@ if __name__ == '__main__':
         correction_matrix = cv.getPerspectiveTransform(detected_corners, output_corners)
         corrected_image = cv.warpPerspective(input_image, correction_matrix, (600, 450))
 
+        # Attempt to compare the edges of the current to the edges of the previous. Ideally, there should be
+        # zero difference between them. These results are not promising though. The alignment isn't close enough
+        # for the detected edges to overlap, so double-edge results are common.
+        edge_image = cv.Canny(corrected_image, 200, 400,)
+        edge_image = cv.GaussianBlur(edge_image, (9, 9), 0, 0)
+        if previous_edge_image is not None:
+            edge_difference_image = cv.absdiff(previous_edge_image, edge_image)
+        previous_edge_image = edge_image
+
         while True:
             k = cv.waitKey(1)
-            # Press escape or q for next image
+            # Press j or f for next image, q or escape to quit
             if k == 'q' or k == 27 or k == 'Q' or k == 1048603 or k == 1048689:
+                sys.exit("Quitting")
+            elif k == 'j' or k == 102 or k == 'f' or k == 106 or k == 65363:
                 break
 
             for corner in detected_corners:
                 cv.circle(input_image, (corner[0], corner[1]), 10, (100, 0, 40), 3)
             cv.imshow("input", input_image)
             cv.imshow("corrected", corrected_image)
+            cv.imshow("corrected edges", edge_image)
+
+            if edge_difference_image is not None:
+                cv.imshow("difference from previous edges", edge_difference_image)
 
     print("All done!")
 
