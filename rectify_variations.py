@@ -32,7 +32,7 @@ def find_corners(image, channel_threshold, dilate_erode_amount):
 
 
 ''' Sort coordinates found from cv.findContours() into a known order: TL, TR, BR, BL by Euclidean distance.
-    The coordinates closest to (0,0) will be selected as the TL point, etc. 
+    The coordinates closest to (0,0) will be selected as the TL point, etc.
     This isn't completely robust, extreme enough perspective transforms could result in the same point
     getting chosen twice.
 '''
@@ -59,7 +59,7 @@ def sort_corners(unsorted_corners, image_width, image_height):
 ''' Detect the corners of a directory of images of colorful planar quadrangles. For example, pictures of rectangular PCBs.
     Warp them to a consistent view. The detected corners of the quadrangles will become the true corners of the new,
     rectangular image.
-    
+
     A clear separation from the background for the majority of the quadrangles is necessary. Detection is done in saturation,
     it could be easily modified to detect based on value or hue.
 '''
@@ -104,15 +104,6 @@ if __name__ == '__main__':
         correction_matrix = cv.getPerspectiveTransform(detected_corners, output_corners)
         corrected_image = cv.warpPerspective(input_image, correction_matrix, (600, 450))
 
-        # Attempt to compare the edges of the current to the edges of the previous. Ideally, there should be
-        # zero difference between them. These results are not promising though. The alignment isn't close enough
-        # for the detected edges to overlap, so double-edge results are common.
-        edge_image = cv.Canny(corrected_image, 200, 400,)
-        edge_image = cv.GaussianBlur(edge_image, (9, 9), 0, 0)
-        if previous_edge_image is not None:
-            edge_difference_image = cv.absdiff(previous_edge_image, edge_image)
-        previous_edge_image = edge_image
-
         while True:
             k = cv.waitKey(1)
             # Press j or f for next image, q or escape to quit
@@ -125,12 +116,5 @@ if __name__ == '__main__':
                 cv.circle(input_image, (corner[0], corner[1]), 10, (100, 0, 40), 3)
             cv.imshow("input", input_image)
             cv.imshow("corrected", corrected_image)
-            cv.imshow("corrected edges", edge_image)
-
-            if edge_difference_image is not None:
-                cv.imshow("difference from previous edges", edge_difference_image)
 
     print("All done!")
-
-
-
