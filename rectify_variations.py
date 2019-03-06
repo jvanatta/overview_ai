@@ -80,9 +80,6 @@ if __name__ == '__main__':
 
     print("Starting work on {0} image files...".format(len(images_to_process)))
 
-    previous_edge_image = None
-    edge_difference_image = None
-
     for image_filename in images_to_process:
         input_image = cv.imread(image_filename)
         if input_image is None:
