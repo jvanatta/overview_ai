@@ -7,10 +7,10 @@ import sys
 import cv2 as cv
 import numpy as np
 
-''' This doesn't shift backwards (negative), and there's some weirdness if max_amount goes above 75 or so, 
-    wherein the hue shifts appear visually discontinuous.
-'''
 def random_hue_shift(image, max_amount):
+    """ This doesn't shift backwards (negative), and there's some weirdness if max_amount goes above 75 or so,
+    wherein the hue shifts appear visually discontinuous.
+    """
     hue_channel, sat_channel, val_channel = cv.split(cv.cvtColor(image, cv.COLOR_BGR2HSV))
     shift_amount = random.randrange(0, int(max_amount))
     adjustment = np.ones(hue_channel.shape, dtype=np.uint8) * shift_amount
@@ -30,10 +30,10 @@ def random_rotation(image, output_size, max_amount_deg, center_point):
     return cv.warpAffine(image, rotation_matrix, output_size, borderMode=cv.BORDER_REPLICATE)
 
 
-''' max_projective values must be very small to avoid transforming the image far outside its boundaries. There's no
-    compensating translation to adjust for that.
-'''
 def random_distort(image, max_affine, max_projective):
+    """ max_projective values must be very small to avoid transforming the image far outside its boundaries. There's no
+    compensating translation to adjust for that.
+    """
     distortion_array = np.array([
         [1 + random.uniform(-1 * max_affine, max_affine), random.uniform(-1 * max_affine, max_affine), 0],
         [random.uniform(-1 * max_affine, max_affine), 1 + random.uniform(-1 * max_affine, max_affine), 0],
@@ -43,9 +43,9 @@ def random_distort(image, max_affine, max_projective):
     return cv.warpPerspective(image, distortion_array, (image.shape[1], image.shape[0]), borderMode=cv.BORDER_REPLICATE, flags=cv.WARP_INVERSE_MAP)
 
 
-''' Generate randomly adjusted variations of an input image.
-'''
 if __name__ == '__main__':
+    """ Generate randomly adjusted variations of an input image.
+    """
     source_filename = "pcb.jpg"
     variation_count = 25
     if not os.path.exists("variations"):

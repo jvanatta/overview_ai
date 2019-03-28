@@ -7,12 +7,12 @@ import sys
 import cv2 as cv
 import numpy as np
 
-''' Adapted from Kinght's answer here:
+def find_corners(image, channel_threshold, dilate_erode_amount):
+    """ Adapted from Kinght's answer here:
     https://stackoverflow.com/questions/8667818/opencv-c-obj-c-detecting-a-sheet-of-paper-square-detection
     Masking in saturation works well for the two base PCB images I tested on, but it's certainly not infallible.
     Consistency of the lighting, background, and PCB color is important. Masking on value also works.
-'''
-def find_corners(image, channel_threshold, dilate_erode_amount):
+    """
     hue_channel, sat_channel, val_channel = cv.split(cv.cvtColor(image, cv.COLOR_BGR2HSV))
     _, threshed = cv.threshold(sat_channel, channel_threshold, 255, cv.THRESH_BINARY)
     # A dilate/erode pass helps remove the holes in the mask from the components on the PCB
@@ -31,13 +31,12 @@ def find_corners(image, channel_threshold, dilate_erode_amount):
     return approx
 
 
-''' Sort coordinates found from cv.findContours() into a known order: TL, TR, BR, BL by Euclidean distance.
+def sort_corners(unsorted_corners, image_width, image_height):
+    """ Sort coordinates found from cv.findContours() into a known order: TL, TR, BR, BL by Euclidean distance.
     The coordinates closest to (0,0) will be selected as the TL point, etc.
     This isn't completely robust, extreme enough perspective transforms could result in the same point
     getting chosen twice.
-'''
-def sort_corners(unsorted_corners, image_width, image_height):
-
+    """
     def distance_cost(a_tuple, b_tuple):
         return (a_tuple[0] - b_tuple[0])**2 + (a_tuple[1] - b_tuple[1])**2
 
@@ -56,14 +55,14 @@ def sort_corners(unsorted_corners, image_width, image_height):
     return sorted_corners
 
 
-''' Detect the corners of a directory of images of colorful planar quadrangles. For example, pictures of rectangular PCBs.
+if __name__ == '__main__':
+    """ Detect the corners of a directory of images of colorful planar quadrangles. For example, pictures of rectangular PCBs.
     Warp them to a consistent view. The detected corners of the quadrangles will become the true corners of the new,
     rectangular image.
 
     A clear separation from the background for the majority of the quadrangles is necessary. Detection is done in saturation,
     it could be easily modified to detect based on value or hue.
-'''
-if __name__ == '__main__':
+    """
     source_files = "variations"
     output_x_size = 600
     output_y_size = 450
