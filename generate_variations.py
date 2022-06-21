@@ -2,12 +2,13 @@
 # Python 3
 import os
 import random
+from typing import Tuple
 import sys
 
 import cv2 as cv
 import numpy as np
 
-def random_hue_shift(image, max_amount):
+def random_hue_shift(image: np.ndarray, max_amount: int) -> np.ndarray:
     """ This doesn't shift backwards (negative), and there's some weirdness if max_amount goes above 75 or so,
     wherein the hue shifts appear visually discontinuous.
     """
@@ -18,19 +19,21 @@ def random_hue_shift(image, max_amount):
     return cv.cvtColor(cv.merge([hue_channel + adjustment, sat_channel, val_channel]), cv.COLOR_HSV2BGR)
 
 
-def random_scale(image, max_amount):
+def random_scale(image: np.ndarray, max_amount: float) -> np.ndarray:
     scale_amount = 1.0 + random.uniform(-1 * max_amount, max_amount)
     new_size = int(round(image.shape[1] * scale_amount)), int(round(image.shape[0] * scale_amount))
     return cv.resize(image, new_size, interpolation=cv.INTER_LINEAR)
 
 
-def random_rotation(image, output_size, max_amount_deg, center_point):
+def random_rotation(
+        image: np.ndarray, output_size: Tuple[int, int],
+        max_amount_deg: float, center_point: Tuple[float, float]) -> np.ndarray:
     rotation_matrix = cv.getRotationMatrix2D(center_point, random.uniform(-1 * max_amount_deg, max_amount_deg), 1)
 
     return cv.warpAffine(image, rotation_matrix, output_size, borderMode=cv.BORDER_REPLICATE)
 
 
-def random_distort(image, max_affine, max_projective):
+def random_distort(image: np.ndarray, max_affine: float, max_projective: float) -> np.ndarray:
     """ max_projective values must be very small to avoid transforming the image far outside its boundaries. There's no
     compensating translation to adjust for that.
     """
@@ -40,7 +43,8 @@ def random_distort(image, max_affine, max_projective):
         [random.uniform(-1 * max_projective, max_projective), random.uniform(-1 * max_projective, max_projective), 1]
     ], dtype="float32")
 
-    return cv.warpPerspective(image, distortion_array, (image.shape[1], image.shape[0]), borderMode=cv.BORDER_REPLICATE, flags=cv.WARP_INVERSE_MAP)
+    return cv.warpPerspective(
+        image, distortion_array, (image.shape[1], image.shape[0]), borderMode=cv.BORDER_REPLICATE, flags=cv.WARP_INVERSE_MAP)
 
 
 if __name__ == '__main__':

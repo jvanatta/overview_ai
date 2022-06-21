@@ -7,7 +7,7 @@ import sys
 import cv2 as cv
 import numpy as np
 
-def find_corners(image, channel_threshold, dilate_erode_amount):
+def find_corners(image: np.ndarray, channel_threshold: int, dilate_erode_amount: int) -> np.ndarray:
     """ Adapted from Kinght's answer here:
     https://stackoverflow.com/questions/8667818/opencv-c-obj-c-detecting-a-sheet-of-paper-square-detection
     Masking in saturation works well for the two base PCB images I tested on, but it's certainly not infallible.
@@ -31,8 +31,7 @@ def find_corners(image, channel_threshold, dilate_erode_amount):
     return approx
 
 
-
-def sort_corners(unsorted_corners, image_width, image_height):
+def sort_corners(unsorted_corners: np.ndarray, image_width: int, image_height: int) -> np.ndarray:
     """ Sort coordinates found from cv.findContours() into a known order: TL, TR, BR, BL by Euclidean distance.
     The coordinates closest to (0,0) will be selected as the TL point, etc.
     This isn't completely robust, extreme enough perspective transforms could result in the same point
@@ -89,7 +88,8 @@ if __name__ == '__main__':
         image_height = input_image.shape[0]
 
         # Detect the corners in the input image, then sort them to the same TL, TR, BR, BL order as the output
-        detected_corners = sort_corners(find_corners(input_image, detection_mask_threshold, dilate_erode_amount), image_width, image_height)
+        detected_corners = sort_corners(find_corners(
+            input_image, detection_mask_threshold, dilate_erode_amount), image_width, image_height)
 
         output_corners = np.array([
             [0, 0],
