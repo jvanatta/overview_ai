@@ -31,6 +31,7 @@ def find_corners(image, channel_threshold, dilate_erode_amount):
     return approx
 
 
+
 def sort_corners(unsorted_corners, image_width, image_height):
     """ Sort coordinates found from cv.findContours() into a known order: TL, TR, BR, BL by Euclidean distance.
     The coordinates closest to (0,0) will be selected as the TL point, etc.
@@ -109,7 +110,7 @@ if __name__ == '__main__':
                 break
 
             for corner in detected_corners:
-                cv.circle(input_image, (corner[0], corner[1]), 10, (100, 0, 40), 3)
+                cv.circle(input_image, (int(round((corner[0]))), int(round(corner[1]))), 10, (100, 0, 40), 3)
             cv.imshow("input", input_image)
             cv.imshow("corrected", corrected_image)
 
